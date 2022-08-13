@@ -1,0 +1,210 @@
+package hedera
+
+/*-
+ *
+ * Hedera Go SDK
+ *
+ * Copyright (C) 2020 - 2022 Hedera Hashgraph, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+import (
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/hashgraph/hedera-protobufs-go/services"
+	"github.com/pkg/errors"
+)
+
+// _ECDSAPrivateKey is an Key_ECDSASecp256K1 private key.
+type _ECDSAPrivateKey struct {
+	*ecdsa.PrivateKey
+}
+
+func _GenerateECDSAPrivateKey() (*_ECDSAPrivateKey, error) {
+	key, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+	if err != nil {
+		return &_ECDSAPrivateKey{}, err
+	}
+
+	return &_ECDSAPrivateKey{
+		key,
+	}, nil
+}
+
+func _ECDSAPrivateKeyFromBytes(byt []byte) (*_ECDSAPrivateKey, error) {
+	length := len(byt)
+	switch length {
+	case 32:
+		return _ECDSAPrivateKeyFromBytesRaw(byt)
+	case 50:
+		return _ECDSAPrivateKeyFromBytesDer(byt)
+	default:
+		return &_ECDSAPrivateKey{}, _NewErrBadKeyf("invalid private key length: %v bytes", len(byt))
+	}
+}
+
+func _ECDSAPrivateKeyFromBytesRaw(byt []byte) (*_ECDSAPrivateKey, error) {
+	length := len(byt)
+	if length != 32 {
+		return &_ECDSAPrivateKey{}, _NewErrBadKeyf("invalid private key length: %v bytes", len(byt))
+	}
+
+	key, err := crypto.ToECDSA(byt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &_ECDSAPrivateKey{
+		key,
+	}, nil
+}
+
+func _ECDSAPrivateKeyFromBytesDer(byt []byte) (*_ECDSAPrivateKey, error) {
+	given := hex.EncodeToString(byt)
+
+	result := strings.ReplaceAll(given, _ECDSAPrivateKeyPrefix, "")
+	decoded, err := hex.DecodeString(result)
+	if err != nil {
+		return &_ECDSAPrivateKey{}, err
+	}
+
+	if len(decoded) != 32 {
+		return &_ECDSAPrivateKey{}, _NewErrBadKeyf("invalid private key length: %v bytes", len(byt))
+	}
+
+	key, err := crypto.ToECDSA(decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return &_ECDSAPrivateKey{
+		key,
+	}, nil
+}
+
+func _ECDSAPrivateKeyFromString(s string) (*_ECDSAPrivateKey, error) {
+	b, err := hex.DecodeString(strings.ToLower(s))
+	if err != nil {
+		return &_ECDSAPrivateKey{}, err
+	}
+
+	return _ECDSAPrivateKeyFromBytes(b)
+}
+
+func (sk *_ECDSAPrivateKey) _PublicKey() *_ECDSAPublicKey {
+	if sk.PrivateKey.Y == nil && sk.PrivateKey.X == nil {
+		b := sk.D.Bytes()
+		x, y := crypto.S256().ScalarBaseMult(b)
+		sk.X = x
+		sk.Y = y
+		return &_ECDSAPublicKey{
+			&ecdsa.PublicKey{
+				Curve: crypto.S256(),
+				X:     x,
+				Y:     y,
+			},
+		}
+	}
+
+	return &_ECDSAPublicKey{
+		&ecdsa.PublicKey{
+			Curve: sk.Curve,
+			X:     sk.X,
+			Y:     sk.Y,
+		},
+	}
+}
+
+func (sk _ECDSAPrivateKey) _Sign(message []byte) []byte {
+	hash := crypto.Keccak256Hash(message)
+	sig, err := crypto.Sign(hash.Bytes(), sk.PrivateKey)
+	if err != nil {
+		panic(err)
+	}
+
+	// signature returned has a ecdsa recovery byte at the end,
+	// need to remove it for verification to work.
+	return sig[:len(sig)-1]
+}
+
+func (sk _ECDSAPrivateKey) _BytesRaw() []byte {
+	privateKey := make([]byte, 32)
+	temp := sk.D.Bytes()
+	copy(privateKey[32-len(temp):], temp)
+
+	return privateKey
+}
+
+func (sk _ECDSAPrivateKey) _BytesDer() []byte {
+	prefix, _ := hex.DecodeString(_ECDSAPrivateKeyPrefix)
+	return append(prefix, sk._BytesRaw()...)
+}
+
+func (sk _ECDSAPrivateKey) _StringDer() string {
+	return fmt.Sprint(hex.EncodeToString(sk._BytesDer()))
+}
+
+func (sk _ECDSAPrivateKey) _StringRaw() string {
+	return fmt.Sprint(hex.EncodeToString(sk._BytesRaw()))
+}
+
+func (sk _ECDSAPrivateKey) _ToProtoKey() *services.Key {
+	return sk._PublicKey()._ToProtoKey()
+}
+
+func (sk _ECDSAPrivateKey) _SignTransaction(transaction *Transaction) ([]byte, error) {
+	transaction._RequireOneNodeAccountID()
+
+	if transaction.signedTransactions._Length() == 0 {
+		return make([]byte, 0), errTransactionRequiresSingleNodeAccountID
+	}
+
+	signature := sk._Sign(transaction.signedTransactions._Get(0).(*services.SignedTransaction).GetBodyBytes())
+
+	publicKey := sk._PublicKey()
+	if publicKey == nil {
+		return []byte{}, errors.New("public key is nil")
+	}
+
+	wrappedPublicKey := PublicKey{
+		ecdsaPublicKey: publicKey,
+	}
+
+	if transaction._KeyAlreadySigned(wrappedPublicKey) {
+		return []byte{}, nil
+	}
+
+	transaction.transactions = _NewLockableSlice()
+	transaction.publicKeys = append(transaction.publicKeys, wrappedPublicKey)
+	transaction.transactionSigners = append(transaction.transactionSigners, nil)
+	transaction.transactionIDs.locked = true
+
+	for index := 0; index < transaction.signedTransactions._Length(); index++ {
+		temp := transaction.signedTransactions._Get(index).(*services.SignedTransaction)
+
+		temp.SigMap.SigPair = append(
+			temp.SigMap.SigPair,
+			publicKey._ToSignaturePairProtobuf(signature),
+		)
+		transaction.signedTransactions._Set(index, temp)
+	}
+
+	return signature, nil
+}
