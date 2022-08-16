@@ -1,4 +1,4 @@
-module renix-codex/hedera-connect
+module github.com/renix-codex/hedera-connect
 
 go 1.17
 
