@@ -1,4 +1,4 @@
-package topicid
+package hcs
 
 import (
 	"github.com/gin-gonic/gin"
