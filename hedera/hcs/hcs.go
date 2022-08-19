@@ -12,6 +12,23 @@ type HCSTx struct {
 	TransactionStatus   string `json:"transactionStatus,omitempty"`
 }
 
+//createTopicID return new topicID
+func CreateTopicID(c *gin.Context, client *hedera.Client) (string, error) {
+	transactionResponse, err := hedera.NewTopicCreateTransaction().Execute(client)
+	if err != nil {
+		return "", gin.Error{Err: err}
+	}
+
+	//Get the topic create transaction receipt
+	transactionReceipt, err := transactionResponse.GetReceipt(client)
+	if err != nil {
+		return "", gin.Error{Err: err}
+	}
+
+	return transactionReceipt.TopicID.String(), nil
+}
+
+//HCSSubmitMessage submits a message to topicID
 func HCSSubmitMessage(c *gin.Context, client *hedera.Client, hcsTopicID string, hcsMessage string) (*HCSTx, error) {
 
 	topicID, err := hedera.TopicIDFromString(hcsTopicID)
