@@ -25,7 +25,7 @@ client, err := hedera_connect.InitializeClient(accountID, privateKey, mainnetEna
  Response ```{
 	"topicID": "0.0.xxxxxxx"
 }```
-Status:200
+Status:```200```
  
  Submit Message on HCS - ```/submit-message```
  Payload ```{
@@ -37,4 +37,4 @@ Response ```
 	"topicSequenceNumber": 2,
 	"transactionStatus": "SUCCESS"
 }```
-Status:200
+Status:```200```
