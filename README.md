@@ -10,3 +10,31 @@ Hashgraph is a distributed ledger technology that has been described as an alter
 Hedera goes beyond blockchain for developers to create the next era of fast, fair, and secure applications.
 ### Hedera Consensus Service ###
 Hedera Consensus Service (HCS) is a purpose-built tool for creating decentralized, auditable logs of immutable and timestamped events for web2 and web3 applications. Messages are submitted to the Hedera network for consensus, given a trusted timestamp, and fairly ordered. HCS is used by applications in production to track provenance across supply chains, log asset transfers between blockchain networks, count votes in a DAO, monitor IoT devices, and more.
+## Application ##
+Hedera client initialise once the service is up and running. Client initialisation defined in main.go. 
+```
+client, err := hedera_connect.InitializeClient(accountID, privateKey, mainnetEnabledBool)
+	if err != nil {
+		log.Print("hedera client initialization failed")
+		return
+	}
+  ```
+ ### APIs ###
+ Create topic ID on HCS - ```/topic-id``` 
+ No payload 
+ Response ```{
+	"topicID": "0.0.xxxxxxx"
+}```
+Status:200
+ 
+ Submit Message on HCS - ```/submit-message```
+ Payload ```{
+	"message":"hello world!",
+	"topicID": "0.0.xxxxxxx"
+}```
+Response ```
+	"topicID": "0.0.xxxxxxx",
+	"topicSequenceNumber": 2,
+	"transactionStatus": "SUCCESS"
+}```
+Status:200
