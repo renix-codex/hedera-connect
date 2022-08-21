@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/renix-codex/hedera-connect/handlers"
+	routes "github.com/renix-codex/hedera-connect/handlers"
 	hedera_connect "github.com/renix-codex/hedera-connect/hedera"
 )
 
@@ -36,6 +36,6 @@ func main() {
 	//initialize gin gonic
 	router := gin.Default()
 	router.Use(gin.Recovery())
-	handlers.InitializeRoutes(router, client)
+	routes.InitializeRoutes(router, client)
 	router.Run(":6000")
 }
