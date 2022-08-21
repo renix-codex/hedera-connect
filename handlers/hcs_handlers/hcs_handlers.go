@@ -23,7 +23,7 @@ var CreateTopicID = func(client *hedera.Client) func(c *gin.Context) {
 
 var SubmitMessage = func(client *hedera.Client) func(c *gin.Context) {
 	return func(c *gin.Context) {
-
+		topicid := c.Param("topicid")
 		htx := &hcs.HCSTx{}
 		err := c.ShouldBindJSON(&htx)
 		if err != nil {
@@ -31,7 +31,7 @@ var SubmitMessage = func(client *hedera.Client) func(c *gin.Context) {
 			return
 		}
 
-		tx, err := hcs.HCSSubmitMessage(c, client, htx.TopicID, htx.Message)
+		tx, err := hcs.HCSSubmitMessage(c, client, topicid, htx.Message)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "hedera consenses service failed to submit message"})
 			return

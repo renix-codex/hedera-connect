@@ -1,4 +1,4 @@
-package handlers
+package routes
 
 import (
 	"github.com/gin-gonic/gin"
@@ -8,5 +8,5 @@ import (
 
 func InitializeRoutes(e *gin.Engine, client *hedera.Client) {
 	e.POST("/topic-id", hcs_handlers.CreateTopicID(client))
-	e.POST("/submit-message", hcs_handlers.SubmitMessage(client))
+	e.POST("/submit-message/topic-id/:topicid", hcs_handlers.SubmitMessage(client))
 }
